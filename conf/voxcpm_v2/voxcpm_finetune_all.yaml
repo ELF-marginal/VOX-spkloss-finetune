@@ -1,0 +1,37 @@
+pretrained_path: /path/to/VoxCPM2/
+train_manifest: /path/to/train.jsonl
+val_manifest: null
+sample_rate: 16000        # AudioVAE encoder input rate; must match audio_vae_config.sample_rate
+out_sample_rate: 48000    # AudioVAE decoder output rate; used for TensorBoard audio logging
+batch_size: 2
+grad_accum_steps: 8  # effective batch size = batch_size × grad_accum_steps = 16
+num_workers: 8
+num_iters: 1000
+log_interval: 10
+valid_interval: 500
+save_interval: 500
+learning_rate: 0.00001
+weight_decay: 0.01
+warmup_steps: 100
+max_steps: 1000
+max_batch_tokens: 8192
+max_grad_norm: 1.0        # gradient clipping max norm; 0 = disabled
+save_path: /path/to/checkpoints/finetune_all
+tensorboard: /path/to/logs/finetune_all
+lambdas:
+  loss/diff: 1.0
+  loss/stop: 1.0
+  loss/spk: 0.1
+spk_loss:
+  enable: false
+  checkpoint: D:/Pycharmprojects/VoxCPM-spk_emb/latent_embedding_checkpoint/latest.pt
+  chunk_size: 50
+  num_gen_chunks: 2
+  num_ref_chunks: 4
+  min_progress: 0.2
+  rollout_from_progress: 0.2
+  progress_power: 2.0
+  inference_timesteps: 10
+  cfg_value: 2.0
+  temperature: 1.0
+  val_enable: false
