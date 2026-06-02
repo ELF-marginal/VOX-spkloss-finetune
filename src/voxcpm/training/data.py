@@ -1,4 +1,5 @@
 import math
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import argbind
@@ -24,18 +25,38 @@ def load_audio_text_datasets(
     audio_column: str = DEFAULT_AUDIO_COLUMN,
     ref_audio_column: str = DEFAULT_REF_AUDIO_COLUMN,
     dataset_id_column: str = DEFAULT_ID_COLUMN,
+    audio_root: str = "",
+    ref_audio_root: str = "",
     sample_rate: int = 16_000,
     num_proc: int = 1,
 ) -> Tuple[Dataset, Optional[Dataset]]:
+    del num_proc
     data_files = {"train": train_manifest}
     if val_manifest:
         data_files["validation"] = val_manifest
 
     dataset_dict: DatasetDict = load_dataset("json", data_files=data_files)
+    audio_root_path = Path(audio_root).expanduser() if audio_root else None
+    ref_audio_root_path = Path(ref_audio_root).expanduser() if ref_audio_root else audio_root_path
+
+    def remap_audio_path(value, root: Optional[Path]):
+        if root is None or value is None:
+            return value
+        if isinstance(value, dict):
+            path_value = value.get("path")
+            if isinstance(path_value, str):
+                value = dict(value)
+                value["path"] = str(root / Path(path_value).name)
+            return value
+        if isinstance(value, str):
+            return str(root / Path(value).name)
+        return value
 
     def prepare(ds: Dataset) -> Dataset:
         if audio_column not in ds.column_names:
             raise ValueError(f"Expected '{audio_column}' column in manifest.")
+        if audio_root_path is not None:
+            ds = ds.map(lambda row: {audio_column: remap_audio_path(row[audio_column], audio_root_path)})
         ds = ds.cast_column(audio_column, Audio(sampling_rate=sample_rate))
         if audio_column != DEFAULT_AUDIO_COLUMN:
             ds = ds.rename_column(audio_column, DEFAULT_AUDIO_COLUMN)
@@ -45,6 +66,8 @@ def load_audio_text_datasets(
         # ref_audio is optional — cast to Audio if the column exists
         ref_col = ref_audio_column if ref_audio_column in ds.column_names else DEFAULT_REF_AUDIO_COLUMN
         if ref_col in ds.column_names:
+            if ref_audio_root_path is not None:
+                ds = ds.map(lambda row: {ref_col: remap_audio_path(row[ref_col], ref_audio_root_path)})
             ds = ds.cast_column(ref_col, Audio(sampling_rate=sample_rate))
             if ref_col != DEFAULT_REF_AUDIO_COLUMN:
                 ds = ds.rename_column(ref_col, DEFAULT_REF_AUDIO_COLUMN)

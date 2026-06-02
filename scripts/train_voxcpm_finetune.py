@@ -47,6 +47,8 @@ def train(
     pretrained_path: str,
     train_manifest: str,
     val_manifest: str = "",
+    audio_root: str = "",
+    ref_audio_root: str = "",
     sample_rate: int = 16_000,
     out_sample_rate: int = 0,  # AudioVAE decoder output rate; used for TensorBoard audio logging
     batch_size: int = 1,
@@ -76,6 +78,8 @@ def train(
     pretrained_path = str(Path(pretrained_path).expanduser())
     train_manifest = str(Path(train_manifest).expanduser())
     val_manifest = str(Path(val_manifest).expanduser()) if val_manifest else ""
+    audio_root = str(Path(audio_root).expanduser()) if audio_root else ""
+    ref_audio_root = str(Path(ref_audio_root).expanduser()) if ref_audio_root else ""
     save_path = str(Path(save_path).expanduser())
     tensorboard = str(Path(tensorboard).expanduser()) if tensorboard else ""
     if spk_loss and spk_loss.get("checkpoint"):
@@ -121,6 +125,8 @@ def train(
     train_ds, val_ds = load_audio_text_datasets(
         train_manifest=train_manifest,
         val_manifest=val_manifest,
+        audio_root=audio_root,
+        ref_audio_root=ref_audio_root,
         sample_rate=sample_rate,
     )
 
