@@ -1,6 +1,6 @@
-pretrained_path: /path/to/VoxCPM1.5/
-train_manifest: /path/to/train.jsonl
-val_manifest: null
+pretrained_path: /home/yhy/projects/VOX-spkloss-finetune/model/VoxCPMv1.5
+train_manifest: /home/lqh/datasets/momo_5000h/metadata_train.jsonl
+val_manifest: /home/lqh/datasets/momo_5000h/metadata_val.jsonl
 sample_rate: 44100
 batch_size: 16
 grad_accum_steps: 1  # Gradient accumulation steps, >1 can increase effective batch size without increasing memory
@@ -14,15 +14,15 @@ weight_decay: 0.01
 warmup_steps: 100
 max_steps: 2000
 max_batch_tokens: 8192  # Example: single batch can have at most 16k tokens, with batch_size=4, each sample can have at most 4096 tokens
-save_path: /path/to/checkpoints/finetune_all
-tensorboard: /path/to/logs/finetune_all
+save_path: /home/yhy/projects/VOX-spkloss-finetune/outputss/checkpoints/v15_spkloss_all
+tensorboard: /home/yhy/projects/VOX-spkloss-finetune/outputss/logs/v15_spkloss_all
 lambdas:
   loss/diff: 1.0
   loss/stop: 1.0
   loss/spk: 0.1
 spk_loss:
-  enable: false
-  checkpoint: D:/Pycharmprojects/VoxCPM-spk_emb/latent_embedding_checkpoint/latest.pt
+  enable: true
+  checkpoint: /home/yhy/projects/VOX-spkloss-finetune/model/Latent-embed/latest.pt
   chunk_size: 50
   num_gen_chunks: 2
   num_ref_chunks: 4

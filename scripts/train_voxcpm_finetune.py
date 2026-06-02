@@ -73,6 +73,14 @@ def train(
     distribute: bool = False,  # If True, save hf_model_id as base_model; otherwise save pretrained_path
 ):
     _ = config_path
+    pretrained_path = str(Path(pretrained_path).expanduser())
+    train_manifest = str(Path(train_manifest).expanduser())
+    val_manifest = str(Path(val_manifest).expanduser()) if val_manifest else ""
+    save_path = str(Path(save_path).expanduser())
+    tensorboard = str(Path(tensorboard).expanduser()) if tensorboard else ""
+    if spk_loss and spk_loss.get("checkpoint"):
+        spk_loss = dict(spk_loss)
+        spk_loss["checkpoint"] = str(Path(spk_loss["checkpoint"]).expanduser())
 
     # Validate distribution options
     if lora is not None and distribute and not hf_model_id:
