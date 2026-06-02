@@ -2,6 +2,7 @@ pretrained_path: /home/yhy/projects/VOX-spkloss-finetune/model/VoxCPMv1.5
 train_manifest: /home/lqh/datasets/momo_5000h/metadata_train.jsonl
 val_manifest: /home/lqh/datasets/momo_5000h/metadata_val.jsonl
 audio_root: /home/lqh/datasets/momo_5000h/audio
+skip_missing_audio: true
 sample_rate: 44100
 batch_size: 16
 grad_accum_steps: 1  # Gradient accumulation steps, >1 can increase effective batch size without increasing memory

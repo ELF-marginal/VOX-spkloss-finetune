@@ -49,6 +49,7 @@ def train(
     val_manifest: str = "",
     audio_root: str = "",
     ref_audio_root: str = "",
+    skip_missing_audio: bool = True,
     sample_rate: int = 16_000,
     out_sample_rate: int = 0,  # AudioVAE decoder output rate; used for TensorBoard audio logging
     batch_size: int = 1,
@@ -127,6 +128,7 @@ def train(
         val_manifest=val_manifest,
         audio_root=audio_root,
         ref_audio_root=ref_audio_root,
+        skip_missing_audio=skip_missing_audio,
         sample_rate=sample_rate,
     )
 

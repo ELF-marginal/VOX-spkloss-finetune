@@ -27,6 +27,7 @@ def load_audio_text_datasets(
     dataset_id_column: str = DEFAULT_ID_COLUMN,
     audio_root: str = "",
     ref_audio_root: str = "",
+    skip_missing_audio: bool = True,
     sample_rate: int = 16_000,
     num_proc: int = 1,
 ) -> Tuple[Dataset, Optional[Dataset]]:
@@ -46,17 +47,37 @@ def load_audio_text_datasets(
             path_value = value.get("path")
             if isinstance(path_value, str):
                 value = dict(value)
-                value["path"] = str(root / Path(path_value).name)
+                name = Path(path_value).name
+                value["path"] = str(root / name)
             return value
         if isinstance(value, str):
-            return str(root / Path(value).name)
+            name = Path(value).name
+            return str(root / name)
         return value
 
-    def prepare(ds: Dataset) -> Dataset:
+    def audio_path_exists(value) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, dict):
+            value = value.get("path")
+        if not isinstance(value, str):
+            return False
+        return Path(value).exists()
+
+    def prepare(ds: Dataset, split_name: str) -> Dataset:
         if audio_column not in ds.column_names:
             raise ValueError(f"Expected '{audio_column}' column in manifest.")
         if audio_root_path is not None:
             ds = ds.map(lambda row: {audio_column: remap_audio_path(row[audio_column], audio_root_path)})
+        before_filter = len(ds)
+        if skip_missing_audio:
+            ds = ds.filter(lambda row: audio_path_exists(row[audio_column]))
+        print(
+            f"[data] {split_name} audio found: {len(ds)} / {before_filter}; "
+            f"missing skipped: {before_filter - len(ds)}"
+        )
+        if len(ds) == 0:
+            raise ValueError(f"No readable audio found for split '{split_name}'.")
         ds = ds.cast_column(audio_column, Audio(sampling_rate=sample_rate))
         if audio_column != DEFAULT_AUDIO_COLUMN:
             ds = ds.rename_column(audio_column, DEFAULT_AUDIO_COLUMN)
@@ -79,8 +100,8 @@ def load_audio_text_datasets(
             ds = ds.add_column(DEFAULT_ID_COLUMN, [0] * len(ds))
         return ds
 
-    train_ds = prepare(dataset_dict["train"])
-    val_ds = prepare(dataset_dict["validation"]) if "validation" in dataset_dict else None
+    train_ds = prepare(dataset_dict["train"], "train")
+    val_ds = prepare(dataset_dict["validation"], "validation") if "validation" in dataset_dict else None
     return train_ds, val_ds
 
 
