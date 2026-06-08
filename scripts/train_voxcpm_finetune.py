@@ -42,6 +42,30 @@ from voxcpm.training import (
 )
 
 
+def _resolve_module(root: torch.nn.Module, module_name: str) -> torch.nn.Module:
+    module = root
+    for part in module_name.split("."):
+        if not hasattr(module, part):
+            raise ValueError(f"freeze_modules entry '{module_name}' not found at '{part}'")
+        module = getattr(module, part)
+    if not isinstance(module, torch.nn.Module):
+        raise ValueError(f"freeze_modules entry '{module_name}' is not a torch.nn.Module")
+    return module
+
+
+def freeze_named_modules(model: torch.nn.Module, module_names: list[str] | None) -> dict[str, int]:
+    frozen: dict[str, int] = {}
+    for module_name in module_names or []:
+        module = _resolve_module(model, module_name)
+        count = 0
+        for param in module.parameters():
+            if param.requires_grad:
+                param.requires_grad = False
+                count += param.numel()
+        frozen[module_name] = count
+    return frozen
+
+
 @argbind.bind(without_prefix=True)
 def train(
     pretrained_path: str,
@@ -68,6 +92,7 @@ def train(
     tensorboard: str = "",
     lambdas: Dict[str, float] = {"loss/diff": 1.0, "loss/stop": 1.0},
     lora: dict = None,
+    freeze_modules: list[str] = None,
     config_path: str = "",
     max_grad_norm: float = 0.0,  # gradient clipping; 0 = disabled (backward compat)
     spk_loss: dict = None,
@@ -116,6 +141,11 @@ def train(
         pretrained_path, optimize=False, training=True, lora_config=LoRAConfig(**lora) if lora else None
     )
     tokenizer = base_model.text_tokenizer
+
+    frozen_counts = freeze_named_modules(base_model, freeze_modules)
+    if frozen_counts and accelerator.rank == 0:
+        frozen_desc = ", ".join(f"{name}={count:,}" for name, count in frozen_counts.items())
+        tracker.print(f"Frozen modules: {frozen_desc}")
 
     expected_sr = base_model.audio_vae.sample_rate
     assert sample_rate == expected_sr, (
@@ -776,9 +806,13 @@ def load_checkpoint(model, optimizer, scheduler, save_dir: Path, rank: int = 0):
     # Load optimizer state
     optimizer_path = latest_folder / "optimizer.pth"
     if optimizer_path.exists():
-        optimizer.load_state_dict(torch.load(optimizer_path, map_location="cpu"))
-        if rank == 0:
-            print(f"Loaded optimizer state from {optimizer_path}", file=sys.stderr)
+        try:
+            optimizer.load_state_dict(torch.load(optimizer_path, map_location="cpu"))
+            if rank == 0:
+                print(f"Loaded optimizer state from {optimizer_path}", file=sys.stderr)
+        except (RuntimeError, ValueError) as e:
+            if rank == 0:
+                print(f"Warning: skipped optimizer state from {optimizer_path}: {e}", file=sys.stderr)
 
     # Load scheduler state
     scheduler_path = latest_folder / "scheduler.pth"

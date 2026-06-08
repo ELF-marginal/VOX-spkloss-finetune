@@ -20,8 +20,15 @@ save_path: /home/yhy/projects/VOX-spkloss-finetune/outputss/checkpoints/v15_spkl
 tensorboard: /home/yhy/projects/VOX-spkloss-finetune/outputss/logs/v15_spkloss_all
 lambdas:
   loss/diff: 1.0
-  loss/stop: 1.0
+  loss/stop: 0.0
   loss/spk: 0.1
+freeze_modules:
+  - base_lm
+  - feat_encoder
+  - enc_to_lm_proj
+  - fsq_layer
+  - stop_proj
+  - stop_head
 spk_loss:
   enable: true
   checkpoint: /home/yhy/projects/VOX-spkloss-finetune/model/Latent-embed/latest.pt
@@ -34,4 +41,5 @@ spk_loss:
   inference_timesteps: 10
   cfg_value: 2.0
   temperature: 1.0
+  detach_rollout_history: true
   val_enable: false

@@ -418,10 +418,17 @@ class VoxCPMModel(nn.Module):
         base_audio_feats: torch.Tensor,
         prefix_len: int,
         generated_by_pos: dict[int, torch.Tensor],
+        detach_generated_history: bool = False,
     ) -> torch.Tensor:
         feats = []
         for pos in range(prefix_len):
-            feats.append(generated_by_pos.get(pos, base_audio_feats[pos]))
+            feat = generated_by_pos.get(pos)
+            if feat is not None:
+                if detach_generated_history:
+                    feat = feat.detach()
+            else:
+                feat = base_audio_feats[pos]
+            feats.append(feat)
         return torch.stack(feats, dim=0).unsqueeze(0)
 
     def _spk_get_cond_patch(
@@ -429,6 +436,7 @@ class VoxCPMModel(nn.Module):
         base_audio_feats: torch.Tensor,
         pos: int,
         generated_by_pos: dict[int, torch.Tensor],
+        detach_generated_history: bool = False,
     ) -> torch.Tensor:
         if pos < 0:
             return torch.zeros(
@@ -436,7 +444,10 @@ class VoxCPMModel(nn.Module):
                 device=base_audio_feats.device,
                 dtype=base_audio_feats.dtype,
             )
-        return generated_by_pos.get(pos, base_audio_feats[pos])
+        feat = generated_by_pos.get(pos)
+        if feat is not None:
+            return feat.detach() if detach_generated_history else feat
+        return base_audio_feats[pos]
 
     def _rollout_spk_chunk(
         self,
@@ -452,13 +463,19 @@ class VoxCPMModel(nn.Module):
         n_timesteps: int,
         cfg_value: float,
         temperature: float,
+        detach_rollout_history: bool,
     ) -> torch.Tensor:
         generated_by_pos: dict[int, torch.Tensor] = {}
         rollout_audio_end = chunk_audio_start + chunk_size
 
         for audio_idx in range(rollout_audio_start, rollout_audio_end):
             abs_pos = int(target_indices[audio_idx].item())
-            prefix_audio_feats = self._spk_build_prefix_feats(audio_feats, abs_pos, generated_by_pos)
+            prefix_audio_feats = self._spk_build_prefix_feats(
+                audio_feats,
+                abs_pos,
+                generated_by_pos,
+                detach_generated_history=detach_rollout_history,
+            )
             prefix_text_tokens = text_tokens[:abs_pos].unsqueeze(0)
             prefix_text_mask = text_mask[:abs_pos].unsqueeze(0)
             prefix_audio_mask = audio_mask[:abs_pos].unsqueeze(0)
@@ -469,7 +486,12 @@ class VoxCPMModel(nn.Module):
                 audio_feats=prefix_audio_feats,
                 audio_mask=prefix_audio_mask,
             )
-            cond_patch = self._spk_get_cond_patch(audio_feats, abs_pos - 1, generated_by_pos)
+            cond_patch = self._spk_get_cond_patch(
+                audio_feats,
+                abs_pos - 1,
+                generated_by_pos,
+                detach_generated_history=detach_rollout_history,
+            )
             pred = self.feat_decoder.sample(
                 mu=dit_hidden,
                 patch_size=self.patch_size,
@@ -510,6 +532,7 @@ class VoxCPMModel(nn.Module):
         n_timesteps = max(1, int(cfg.get("inference_timesteps", 10)))
         cfg_value = float(cfg.get("cfg_value", 2.0))
         temperature = float(cfg.get("temperature", 1.0))
+        detach_rollout_history = bool(cfg.get("detach_rollout_history", False))
 
         losses = []
         lengths_cache: dict[int, torch.Tensor] = {}
@@ -564,6 +587,7 @@ class VoxCPMModel(nn.Module):
                     n_timesteps=n_timesteps,
                     cfg_value=cfg_value,
                     temperature=temperature,
+                    detach_rollout_history=detach_rollout_history,
                 )
                 gen_chunks.append(gen_chunk)
 
